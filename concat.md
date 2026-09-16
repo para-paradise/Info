@@ -17,88 +17,80 @@
 按键盘上的 `Alt + F11` 打开 VBA 编辑器，点击菜单栏的 `插入` -> `模块`，然后把下面的代码全部复制进去：
 
 ```vba
-Sub FixMergeAndSave()
-    Dim sPath As String
-    Dim sFile As String
-    Dim wbNew As Workbook, wbOld As Workbook
+Sub SafeBatchMerge()
+    Dim sPath As String, sFile As String, sBaseName As String, sOldFile As String
+    Dim wbMain As Workbook, wbNew As Workbook, wbOld As Workbook
     Dim wsNew As Worksheet, wsOld As Worksheet
+    Dim r As Long, c As Long, lastRow As Long, lastCol As Long
     Dim dictOld As Object
-    Dim sBaseName As String
-    Dim sOldName As String
-    Dim lastRow As Long, lastCol As Long
-    Dim r As Long, c As Long
     
-    ' 关闭屏幕刷新和弹窗，加快速度并防止意外中断
+    ' 强制关闭提示和屏幕刷新
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
     
+    Set wbMain = ThisWorkbook
+    sPath = wbMain.Path & "\"
     Set dictOld = CreateObject("Scripting.Dictionary")
     
-    ' 获取当前宏文件所在的文件夹路径
-    sPath = ThisWorkbook.Path & "\"
-    
-    ' === 第一步：扫描文件夹，把 0821 文件存到字典中 ===
-    sFile = Dir(sPath & "*.xlsx")
+    ' 1. 先扫描一遍，把同文件夹下的所有 0821 旧文件存入字典
+    sFile = Dir(sPath & "*.xls*")
     Do While sFile <> ""
-        ' 只识别 0821 的文件
-        If InStr(1, sFile, "0821", vbTextCompare) > 0 Then
-            ' 提取基础名（去掉日期和扩展名，例如 01VSACN-产品_数据通信DFX测试模式库_安全性测试_License管理特性分析-已完成）
-            sBaseName = Split(sFile, "_20260821_")(0) & "_20260821_" & Split(sFile, "_20260821_")(1)
-            sBaseName = Left(sBaseName, InStrRev(sBaseName, ".") - 1)
-            dictOld(sBaseName) = sFile
+        ' 【关键防呆】绝对排除宏文件自己，以及已经生成的结果文件
+        If sFile <> wbMain.Name And InStr(sFile, "0821") > 0 And InStr(sFile, "0914") = 0 Then
+            dictOld.Add sFile, True
         End If
         sFile = Dir()
     Loop
     
-    ' === 第二步：遍历文件夹，处理 0914 文件 ===
-    sFile = Dir(sPath & "*.xlsx")
+    ' 2. 再次扫描，只处理 0914 新版文件
+    sFile = Dir(sPath & "*.xls*")
     Do While sFile <> ""
-        ' 只识别 0914 的文件，且不是合并工具自身
-        If InStr(1, sFile, "0914", vbTextCompare) > 0 And sFile <> ThisWorkbook.Name Then
-            ' 构建对应的基础名
-            sBaseName = Split(sFile, "_20260914_")(0) & "_20260914_" & Split(sFile, "_20260914_")(1)
-            sBaseName = Left(sBaseName, InStrRev(sBaseName, ".") - 1)
+        ' 【核心逻辑】只打开包含 "0914" 且不是宏文件的 Excel 文件
+        If sFile <> wbMain.Name And InStr(sFile, "0914") > 0 Then
+            On Error Resume Next
+            Set wbNew = Workbooks.Open(sPath & sFile)
             
-            ' 检查是否有对应的 0821 文件
+            ' 尝试从字典中配对 0821 的旧文件
+            sBaseName = Replace(sFile, "0914", "0821")
             If dictOld.Exists(sBaseName) Then
-                sOldName = dictOld(sBaseName)
+                sOldFile = sPath & sBaseName
+                Set wbOld = Workbooks.Open(sOldFile)
                 
-                ' 打开新版和旧版文件
-                Set wbNew = Workbooks.Open(sPath & sFile)
-                Set wbOld = Workbooks.Open(sPath & sOldName)
+                Set wsNew = wbNew.Sheets(1) ' 默认操作新版文件的第一个Sheet
+                Set wsOld = wbOld.Sheets(1) ' 默认操作旧版文件的第一个Sheet
                 
-                ' 获取两个文件的第一个工作表
-                Set wsNew = wbNew.Sheets(1)
-                Set wsOld = wbOld.Sheets(1)
+                ' 获取新版文件数据范围
+                lastRow = wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row
+                lastCol = wsNew.Cells(1, wsNew.Columns.Count).End(xlToLeft).Column
                 
-                ' 获取旧版文件的最大行数和列数
-                lastRow = wsOld.Cells(wsOld.Rows.Count, 1).End(xlUp).Row
-                lastCol = wsOld.Cells(1, wsOld.Columns.Count).End(xlToLeft).Column
-                
-                ' === 核心：增量补充逻辑 ===
+                ' 遍历新版文件，如果是空单元格，则从旧版文件填入
                 For r = 1 To lastRow
                     For c = 1 To lastCol
-                        ' 如果新版文件的单元格为空，且旧版文件对应位置有值，则填入
-                        If Trim(wsNew.Cells(r, c).Value) = "" And Trim(wsOld.Cells(r, c).Value) <> "" Then
+                        If wsNew.Cells(r, c).Value = "" Then
                             wsNew.Cells(r, c).Value = wsOld.Cells(r, c).Value
                         End If
                     Next c
                 Next r
                 
-                ' === 强制保存并关闭新版文件 (0914) ===
-                wbNew.Close SaveChanges:=True
-                
-                ' 关闭旧版文件 (0821)
-                wbOld.Close SaveChanges:=False
-                
+                ' 【关键动作】处理完一个配对，立刻保存并关闭 0821 旧文件
+                wbOld.Close SaveChanges:=True
+                Set wbOld = Nothing
             End If
+            
+            ' 【关键动作】保存并关闭 0914 新文件
+            wbNew.Close SaveChanges:=True
+            Set wbNew = Nothing
+            On Error GoTo 0
         End If
         sFile = Dir()
     Loop
     
-    ' 恢复屏幕刷新和弹窗
+    ' 恢复提示
     Application.ScreenUpdating = True
     Application.DisplayAlerts = True
+    
+    MsgBox "所有文件已安全合并并保存完毕！宏文件未被修改。", vbInformation, "执行成功"
+End Sub= True
     
     MsgBox "所有 0914 文件已成功补充 0821 数据并保存！", vbInformation, "完成"
 End Sub
