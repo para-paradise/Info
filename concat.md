@@ -17,7 +17,7 @@
 按键盘上的 `Alt + F11` 打开 VBA 编辑器，点击菜单栏的 `插入` -> `模块`，然后把下面的代码全部复制进去：
 
 ```vba
-Sub ConditionalGroupFill()
+Sub ConditionalGroupFill_Final()
     Dim sPath As String, sFile As String
     Dim wbMain As Workbook, wbNew As Workbook, wbOld As Workbook
     Dim wsNew As Worksheet, wsOld As Worksheet
@@ -27,6 +27,7 @@ Sub ConditionalGroupFill()
     Dim vNew As Variant, vOld As Variant
     Dim triggerFill As Boolean
     Dim sFileName As String, sOldFileName As String, sOldFilePath As String
+    Dim wsWasProtected As Boolean
     
     ' 1. 优化运行环境
     With Application
@@ -37,14 +38,13 @@ Sub ConditionalGroupFill()
     End With
     
     Set wbMain = ThisWorkbook
-    ' 确保路径以 \ 结尾
     sPath = wbMain.Path
     If Right(sPath, 1) <> "\" Then sPath = sPath & "\"
     
     Set dictOld = CreateObject("Scripting.Dictionary")
     Set arrFiles = CreateObject("System.Collections.ArrayList")
     
-    ' 2. 收集 0821 文件索引 (仅收集文件名，不重置Dir指针)
+    ' 2. 收集 0821 文件索引
     sFile = Dir(sPath & "*.xls*")
     Do While sFile <> ""
         If LCase(sFile) <> LCase(wbMain.Name) And InStr(sFile, "0821") > 0 Then
@@ -62,72 +62,108 @@ Sub ConditionalGroupFill()
         sFile = Dir()
     Loop
     
-    ' 4. 遍历处理 0914 文件
+    ' 4. 遍历处理
     Dim vFile As Variant
     For Each vFile In arrFiles.ToArray
         On Error GoTo FileError
         
-        ' 【修复报错核心】使用字符串截取获取文件名，彻底废弃 Dir() 提取文件名
         sFileName = Mid(CStr(vFile), InStrRev(CStr(vFile), "\") + 1)
         sOldFileName = Replace(sFileName, "0914", "0821")
         sOldFilePath = sPath & sOldFileName
         
-        ' 检查对应的 0821 文件是否存在
         If dictOld.Exists(LCase(sOldFileName)) Then
             matchCount = matchCount + 1
             
-            ' 打开 0914 (可写) 和 0821 (只读)
             Set wbNew = Workbooks.Open(CStr(vFile), ReadOnly:=False)
             Set wbOld = Workbooks.Open(sOldFilePath, ReadOnly:=True)
             
-            Set wsNew = wbNew.Sheets(1)
-            Set wsOld = wbOld.Sheets(1)
+            ' 【修复1】强制使用 Worksheets 而不是 Sheets，避免选中图表页报错
+            Set wsNew = wbNew.Worksheets(1)
+            Set wsOld = wbOld.Worksheets(1)
             
-            ' 获取两个表的最大行数（以A列为准，如果A列可能为空，可改为用特定列如W列）
-            lastRowNew = wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row
-            lastRowOld = wsOld.Cells(wsOld.Rows.Count, 1).End(xlUp).Row
+            ' 【修复2】自动解除工作表保护，防止写入时 1004 报错
+            wsWasProtected = wsNew.ProtectContents
+            If wsWasProtected Then
+                On Error Resume Next
+                wsNew.Unprotect ' 如果有密码，这里可能需要改为 wsNew.Unprotect "你的密码"
+                On Error GoTo FileError
+            End If
+            
+            ' 【修复3】多重探测最大行数，防止A列为空导致行数变成104万行
+            lastRowNew = 1
+            On Error Resume Next
+            lastRowNew = Application.Max( _
+                wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row, _
+                wsNew.Cells(wsNew.Rows.Count, 23).End(xlUp).Row, _
+                wsNew.UsedRange.Rows.Count + wsNew.UsedRange.Row - 1)
+            On Error GoTo FileError
+            
+            lastRowOld = 1
+            On Error Resume Next
+            lastRowOld = Application.Max( _
+                wsOld.Cells(wsOld.Rows.Count, 1).End(xlUp).Row, _
+                wsOld.Cells(wsOld.Rows.Count, 23).End(xlUp).Row, _
+                wsOld.UsedRange.Rows.Count + wsOld.UsedRange.Row - 1)
+            On Error GoTo FileError
+            
             maxRow = Application.Max(lastRowNew, lastRowOld)
+            
+            ' 极限保护：如果计算出的行数异常大，强制截断
+            If maxRow > 100000 Then maxRow = 100000 
             
             bModified = False
             
-            ' 【核心逻辑】逐行判断 W/X/Y/Z，满足条件则覆盖 W~AB 共6列
-            ' 假设第1行为表头，从第2行开始扫描
+            ' 【核心逻辑】逐行判断并覆盖
             For r = 2 To maxRow
                 triggerFill = False
                 
-                ' 检查 W(23) / X(24) / Y(25) / Z(26) 任一列：0821有值 且 0914为空
+                ' 检查 W(23) / X(24) / Y(25) / Z(26)
                 For col = 23 To 26
-                    ' 使用 Trim + CStr 清洗空格、不可见字符和公式假空值
+                    vNew = ""
+                    vOld = ""
+                    On Error Resume Next
                     vNew = Trim(CStr(wsNew.Cells(r, col).Value))
                     vOld = Trim(CStr(wsOld.Cells(r, col).Value))
+                    On Error GoTo FileError
                     
                     If Len(vNew) = 0 And Len(vOld) > 0 Then
                         triggerFill = True
-                        Exit For ' 只要有一列满足即触发，无需继续检查后面的列
+                        Exit For
                     End If
                 Next col
                 
-                ' 触发后：整组覆盖 W/X/Y/Z/AA/AB (第23~28列)
+                ' 触发覆盖 W~AB (23~28)
                 If triggerFill Then
+                    ' 【修复4】写入前清除合并单元格和数组公式，彻底扫清 1004 障碍
+                    On Error Resume Next
+                    wsNew.Cells(r, 23).Resize(1, 6).UnMerge
+                    wsNew.Cells(r, 23).Resize(1, 6).FormulaArray = False ' 尝试清除数组公式属性
+                    On Error GoTo FileError
+                    
+                    ' 逐列安全写入
                     For col = 23 To 28
-                        ' 直接赋值，保留0821的原始格式和公式结果
+                        On Error Resume Next
                         wsNew.Cells(r, col).Value = wsOld.Cells(r, col).Value
+                        On Error GoTo FileError
                     Next col
                     bModified = True
                 End If
             Next r
             
-            ' 如果有修改，则保存 0914 文件
+            ' 恢复工作表保护
+            If wsWasProtected Then
+                On Error Resume Next
+                wsNew.Protect
+                On Error GoTo FileError
+            End If
+            
             If bModified Then
                 wbNew.Save
                 saveCount = saveCount + 1
             End If
             
-            ' 关闭 0821 文件
             wbOld.Close SaveChanges:=False
             Set wbOld = Nothing
-            
-            ' 关闭 0914 文件 (如果没修改，Close时不保存；如果修改了，前面已经Save过了)
             wbNew.Close SaveChanges:=False
             Set wbNew = Nothing
         End If
@@ -135,9 +171,9 @@ Sub ConditionalGroupFill()
         GoTo NextFile
         
 FileError:
-        Debug.Print "处理失败: " & sFileName & " | 错误原因: " & Err.Description
-        ' 确保出错时关闭已打开的工作簿，防止内存泄漏和文件锁定
+        Debug.Print "处理失败: " & sFileName & " | 行:" & r & " 列:" & col & " | 错误:" & Err.Description
         On Error Resume Next
+        If wsWasProtected And Not wsNew Is Nothing Then wsNew.Protect
         If Not wbOld Is Nothing Then wbOld.Close SaveChanges:=False
         If Not wbNew Is Nothing Then wbNew.Close SaveChanges:=False
         Set wbOld = Nothing: Set wbNew = Nothing
@@ -146,7 +182,6 @@ FileError:
 NextFile:
     Next vFile
     
-    ' 5. 恢复 Excel 环境
     With Application
         .ScreenUpdating = True
         .DisplayAlerts = True
@@ -154,7 +189,6 @@ NextFile:
         .EnableEvents = True
     End With
     
-    ' 6. 输出结果
     MsgBox "执行完毕！" & vbCrLf & _
            "成功配对: " & matchCount & " 个文件" & vbCrLf & _
            "实际保存: " & saveCount & " 个文件", vbInformation, "处理完成"
