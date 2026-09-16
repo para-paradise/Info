@@ -18,15 +18,17 @@
 
 ```vba
 Sub ConditionalGroupFill()
-    Dim sPath As String, sFile As String, sBaseName As String
+    Dim sPath As String, sFile As String
     Dim wbMain As Workbook, wbNew As Workbook, wbOld As Workbook
     Dim wsNew As Worksheet, wsOld As Worksheet
     Dim dictOld As Object, arrFiles As Object
-    Dim r As Long, lastRow As Long, col As Long
+    Dim r As Long, lastRowNew As Long, lastRowOld As Long, maxRow As Long, col As Long
     Dim matchCount As Long, saveCount As Long, bModified As Boolean
     Dim vNew As Variant, vOld As Variant
     Dim triggerFill As Boolean
+    Dim sFileName As String, sOldFileName As String, sOldFilePath As String
     
+    ' 1. 优化运行环境
     With Application
         .ScreenUpdating = False
         .DisplayAlerts = False
@@ -35,11 +37,14 @@ Sub ConditionalGroupFill()
     End With
     
     Set wbMain = ThisWorkbook
-    sPath = wbMain.Path & "\"
+    ' 确保路径以 \ 结尾
+    sPath = wbMain.Path
+    If Right(sPath, 1) <> "\" Then sPath = sPath & "\"
+    
     Set dictOld = CreateObject("Scripting.Dictionary")
     Set arrFiles = CreateObject("System.Collections.ArrayList")
     
-    ' 1. 收集0821文件索引
+    ' 2. 收集 0821 文件索引 (仅收集文件名，不重置Dir指针)
     sFile = Dir(sPath & "*.xls*")
     Do While sFile <> ""
         If LCase(sFile) <> LCase(wbMain.Name) And InStr(sFile, "0821") > 0 Then
@@ -48,7 +53,7 @@ Sub ConditionalGroupFill()
         sFile = Dir()
     Loop
     
-    ' 2. 收集0914文件路径
+    ' 3. 收集 0914 文件完整路径
     sFile = Dir(sPath & "*.xls*")
     Do While sFile <> ""
         If LCase(sFile) <> LCase(wbMain.Name) And InStr(sFile, "0914") > 0 Then
@@ -57,72 +62,91 @@ Sub ConditionalGroupFill()
         sFile = Dir()
     Loop
     
-    ' 3. 遍历处理
+    ' 4. 遍历处理 0914 文件
     Dim vFile As Variant
     For Each vFile In arrFiles.ToArray
         On Error GoTo FileError
         
-        Set wbNew = Workbooks.Open(CStr(vFile), ReadOnly:=False)
-        sBaseName = LCase(Replace(Dir(CStr(vFile)), "0914", "0821"))
+        ' 【修复报错核心】使用字符串截取获取文件名，彻底废弃 Dir() 提取文件名
+        sFileName = Mid(CStr(vFile), InStrRev(CStr(vFile), "\") + 1)
+        sOldFileName = Replace(sFileName, "0914", "0821")
+        sOldFilePath = sPath & sOldFileName
         
-        If dictOld.Exists(sBaseName) Then
-            Set wbOld = Workbooks.Open(sPath & Replace(Dir(CStr(vFile)), "0914", "0821"), ReadOnly:=True)
+        ' 检查对应的 0821 文件是否存在
+        If dictOld.Exists(LCase(sOldFileName)) Then
+            matchCount = matchCount + 1
+            
+            ' 打开 0914 (可写) 和 0821 (只读)
+            Set wbNew = Workbooks.Open(CStr(vFile), ReadOnly:=False)
+            Set wbOld = Workbooks.Open(sOldFilePath, ReadOnly:=True)
             
             Set wsNew = wbNew.Sheets(1)
             Set wsOld = wbOld.Sheets(1)
             
-            lastRow = Application.Max(wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row, _
-                                      wsOld.Cells(wsOld.Rows.Count, 1).End(xlUp).Row)
+            ' 获取两个表的最大行数（以A列为准，如果A列可能为空，可改为用特定列如W列）
+            lastRowNew = wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row
+            lastRowOld = wsOld.Cells(wsOld.Rows.Count, 1).End(xlUp).Row
+            maxRow = Application.Max(lastRowNew, lastRowOld)
             
             bModified = False
             
-            ' 【核心逻辑】逐行判断W/X/Y/Z，满足条件则覆盖W~AB共6列
-            For r = 2 To lastRow
+            ' 【核心逻辑】逐行判断 W/X/Y/Z，满足条件则覆盖 W~AB 共6列
+            ' 假设第1行为表头，从第2行开始扫描
+            For r = 2 To maxRow
                 triggerFill = False
                 
-                ' 检查W(23)/X(24)/Y(25)/Z(26)任一列：0821有值 且 0914为空
+                ' 检查 W(23) / X(24) / Y(25) / Z(26) 任一列：0821有值 且 0914为空
                 For col = 23 To 26
+                    ' 使用 Trim + CStr 清洗空格、不可见字符和公式假空值
                     vNew = Trim(CStr(wsNew.Cells(r, col).Value))
                     vOld = Trim(CStr(wsOld.Cells(r, col).Value))
+                    
                     If Len(vNew) = 0 And Len(vOld) > 0 Then
                         triggerFill = True
-                        Exit For  ' 只要有一列满足即触发，无需继续检查
+                        Exit For ' 只要有一列满足即触发，无需继续检查后面的列
                     End If
                 Next col
                 
-                ' 触发后：覆盖 W/X/Y/Z/AA/AB (23~28列)
+                ' 触发后：整组覆盖 W/X/Y/Z/AA/AB (第23~28列)
                 If triggerFill Then
                     For col = 23 To 28
+                        ' 直接赋值，保留0821的原始格式和公式结果
                         wsNew.Cells(r, col).Value = wsOld.Cells(r, col).Value
                     Next col
                     bModified = True
                 End If
             Next r
             
+            ' 如果有修改，则保存 0914 文件
             If bModified Then
                 wbNew.Save
                 saveCount = saveCount + 1
             End If
             
+            ' 关闭 0821 文件
             wbOld.Close SaveChanges:=False
             Set wbOld = Nothing
-            matchCount = matchCount + 1
+            
+            ' 关闭 0914 文件 (如果没修改，Close时不保存；如果修改了，前面已经Save过了)
+            wbNew.Close SaveChanges:=False
+            Set wbNew = Nothing
         End If
         
-        wbNew.Close SaveChanges:=False
-        Set wbNew = Nothing
         GoTo NextFile
         
 FileError:
-        Debug.Print "失败: " & CStr(vFile) & " | " & Err.Description
+        Debug.Print "处理失败: " & sFileName & " | 错误原因: " & Err.Description
+        ' 确保出错时关闭已打开的工作簿，防止内存泄漏和文件锁定
+        On Error Resume Next
         If Not wbOld Is Nothing Then wbOld.Close SaveChanges:=False
         If Not wbNew Is Nothing Then wbNew.Close SaveChanges:=False
         Set wbOld = Nothing: Set wbNew = Nothing
+        On Error GoTo 0
         
 NextFile:
-        On Error GoTo 0
     Next vFile
     
+    ' 5. 恢复 Excel 环境
     With Application
         .ScreenUpdating = True
         .DisplayAlerts = True
@@ -130,7 +154,10 @@ NextFile:
         .EnableEvents = True
     End With
     
-    MsgBox "执行完毕！配对:" & matchCount & " | 实际保存:" & saveCount, vbInformation
+    ' 6. 输出结果
+    MsgBox "执行完毕！" & vbCrLf & _
+           "成功配对: " & matchCount & " 个文件" & vbCrLf & _
+           "实际保存: " & saveCount & " 个文件", vbInformation, "处理完成"
 End Sub
 ```
 
