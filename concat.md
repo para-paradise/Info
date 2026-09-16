@@ -17,7 +17,112 @@
 按键盘上的 `Alt + F11` 打开 VBA 编辑器，点击菜单栏的 `插入` -> `模块`，然后把下面的代码全部复制进去：
 
 ```vba
-
+Sub SafeMergeNoFreeze()
+    Dim sPath As String, sFile As String, sBaseName As String
+    Dim wbMain As Workbook, wbNew As Workbook, wbOld As Workbook
+    Dim wsNew As Worksheet, wsOld As Worksheet
+    Dim dictOld As Object, arrFiles As Object
+    Dim r As Long, c As Long, lastRow As Long, lastCol As Long
+    Dim matchCount As Long, saveCount As Long, bModified As Boolean
+    
+    ' 【关键】强制关闭所有干扰项，防止弹窗和刷新导致假死
+    With Application
+        .ScreenUpdating = False
+        .DisplayAlerts = False
+        .Calculation = xlCalculationManual
+        .EnableEvents = False
+    End With
+    
+    Set wbMain = ThisWorkbook
+    sPath = wbMain.Path & "\"
+    Set dictOld = CreateObject("Scripting.Dictionary")
+    Set arrFiles = CreateObject("System.Collections.ArrayList")
+    
+    ' 1. 先收集所有0821文件名到字典（不打开文件）
+    sFile = Dir(sPath & "*.xls*")
+    Do While sFile <> ""
+        If LCase(sFile) <> LCase(wbMain.Name) And InStr(sFile, "0821") > 0 Then
+            dictOld(LCase(sFile)) = True
+        End If
+        sFile = Dir()
+    Loop
+    
+    ' 2. 将0914文件路径存入数组（避免在Dir循环中打开文件导致死锁）
+    sFile = Dir(sPath & "*.xls*")
+    Do While sFile <> ""
+        If LCase(sFile) <> LCase(wbMain.Name) And InStr(sFile, "0914") > 0 Then
+            arrFiles.Add sPath & sFile
+        End If
+        sFile = Dir()
+    Loop
+    
+    ' 3. 遍历数组处理文件（安全的文件操作方式）
+    Dim vFile As Variant
+    For Each vFile In arrFiles.ToArray
+        On Error GoTo FileError
+        
+        Set wbNew = Workbooks.Open(CStr(vFile), ReadOnly:=False)
+        sBaseName = LCase(Replace(Dir(CStr(vFile)), "0914", "0821"))
+        
+        If dictOld.Exists(sBaseName) Then
+            Set wbOld = Workbooks.Open(sPath & Replace(Dir(CStr(vFile)), "0914", "0821"), ReadOnly:=True)
+            
+            Set wsNew = wbNew.Sheets(1)
+            Set wsOld = wbOld.Sheets(1)
+            
+            ' 获取实际数据边界
+            lastRow = Application.Min(wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row, _
+                                      wsOld.Cells(wsOld.Rows.Count, 1).End(xlUp).Row)
+            lastCol = Application.Min(wsNew.Cells(1, wsNew.Columns.Count).End(xlToLeft).Column, _
+                                      wsOld.Cells(1, wsOld.Columns.Count).End(xlToLeft).Column)
+            
+            bModified = False
+            
+            ' 【性能优化】仅当0914为空且0821非空时才写入
+            For r = 1 To lastRow
+                For c = 1 To lastCol
+                    If Len(wsNew.Cells(r, c).Value) = 0 And Len(wsOld.Cells(r, c).Value) > 0 Then
+                        wsNew.Cells(r, c).Value = wsOld.Cells(r, c).Value
+                        bModified = True
+                    End If
+                Next c
+            Next r
+            
+            ' 显式保存并立即释放旧文件
+            If bModified Then
+                wbNew.Save
+                saveCount = saveCount + 1
+            End If
+            
+            wbOld.Close SaveChanges:=False
+            Set wbOld = Nothing
+            matchCount = matchCount + 1
+        End If
+        
+        wbNew.Close SaveChanges:=False
+        Set wbNew = Nothing
+        GoTo NextFile
+        
+FileError:
+        Debug.Print "处理失败: " & CStr(vFile) & " | 错误: " & Err.Description
+        If Not wbOld Is Nothing Then wbOld.Close SaveChanges:=False
+        If Not wbNew Is Nothing Then wbNew.Close SaveChanges:=False
+        Set wbOld = Nothing: Set wbNew = Nothing
+        
+NextFile:
+        On Error GoTo 0
+    Next vFile
+    
+    ' 恢复Excel环境
+    With Application
+        .ScreenUpdating = True
+        .DisplayAlerts = True
+        .Calculation = xlCalculationAutomatic
+        .EnableEvents = True
+    End With
+    
+    MsgBox "执行完毕！配对:" & matchCount & " | 保存:" & saveCount, vbInformation
+End Sub
 ```
 
 ### 第三步：运行
