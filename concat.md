@@ -17,15 +17,16 @@
 按键盘上的 `Alt + F11` 打开 VBA 编辑器，点击菜单栏的 `插入` -> `模块`，然后把下面的代码全部复制进去：
 
 ```vba
-Sub SafeMergeNoFreeze()
+Sub ConditionalGroupFill()
     Dim sPath As String, sFile As String, sBaseName As String
     Dim wbMain As Workbook, wbNew As Workbook, wbOld As Workbook
     Dim wsNew As Worksheet, wsOld As Worksheet
     Dim dictOld As Object, arrFiles As Object
-    Dim r As Long, c As Long, lastRow As Long, lastCol As Long
+    Dim r As Long, lastRow As Long, col As Long
     Dim matchCount As Long, saveCount As Long, bModified As Boolean
+    Dim vNew As Variant, vOld As Variant
+    Dim triggerFill As Boolean
     
-    ' 【关键】强制关闭所有干扰项，防止弹窗和刷新导致假死
     With Application
         .ScreenUpdating = False
         .DisplayAlerts = False
@@ -38,7 +39,7 @@ Sub SafeMergeNoFreeze()
     Set dictOld = CreateObject("Scripting.Dictionary")
     Set arrFiles = CreateObject("System.Collections.ArrayList")
     
-    ' 1. 先收集所有0821文件名到字典（不打开文件）
+    ' 1. 收集0821文件索引
     sFile = Dir(sPath & "*.xls*")
     Do While sFile <> ""
         If LCase(sFile) <> LCase(wbMain.Name) And InStr(sFile, "0821") > 0 Then
@@ -47,7 +48,7 @@ Sub SafeMergeNoFreeze()
         sFile = Dir()
     Loop
     
-    ' 2. 将0914文件路径存入数组（避免在Dir循环中打开文件导致死锁）
+    ' 2. 收集0914文件路径
     sFile = Dir(sPath & "*.xls*")
     Do While sFile <> ""
         If LCase(sFile) <> LCase(wbMain.Name) And InStr(sFile, "0914") > 0 Then
@@ -56,7 +57,7 @@ Sub SafeMergeNoFreeze()
         sFile = Dir()
     Loop
     
-    ' 3. 遍历数组处理文件（安全的文件操作方式）
+    ' 3. 遍历处理
     Dim vFile As Variant
     For Each vFile In arrFiles.ToArray
         On Error GoTo FileError
@@ -70,25 +71,34 @@ Sub SafeMergeNoFreeze()
             Set wsNew = wbNew.Sheets(1)
             Set wsOld = wbOld.Sheets(1)
             
-            ' 获取实际数据边界
-            lastRow = Application.Min(wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row, _
+            lastRow = Application.Max(wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row, _
                                       wsOld.Cells(wsOld.Rows.Count, 1).End(xlUp).Row)
-            lastCol = Application.Min(wsNew.Cells(1, wsNew.Columns.Count).End(xlToLeft).Column, _
-                                      wsOld.Cells(1, wsOld.Columns.Count).End(xlToLeft).Column)
             
             bModified = False
             
-            ' 【性能优化】仅当0914为空且0821非空时才写入
-            For r = 1 To lastRow
-                For c = 1 To lastCol
-                    If Len(wsNew.Cells(r, c).Value) = 0 And Len(wsOld.Cells(r, c).Value) > 0 Then
-                        wsNew.Cells(r, c).Value = wsOld.Cells(r, c).Value
-                        bModified = True
+            ' 【核心逻辑】逐行判断W/X/Y/Z，满足条件则覆盖W~AB共6列
+            For r = 2 To lastRow
+                triggerFill = False
+                
+                ' 检查W(23)/X(24)/Y(25)/Z(26)任一列：0821有值 且 0914为空
+                For col = 23 To 26
+                    vNew = Trim(CStr(wsNew.Cells(r, col).Value))
+                    vOld = Trim(CStr(wsOld.Cells(r, col).Value))
+                    If Len(vNew) = 0 And Len(vOld) > 0 Then
+                        triggerFill = True
+                        Exit For  ' 只要有一列满足即触发，无需继续检查
                     End If
-                Next c
+                Next col
+                
+                ' 触发后：覆盖 W/X/Y/Z/AA/AB (23~28列)
+                If triggerFill Then
+                    For col = 23 To 28
+                        wsNew.Cells(r, col).Value = wsOld.Cells(r, col).Value
+                    Next col
+                    bModified = True
+                End If
             Next r
             
-            ' 显式保存并立即释放旧文件
             If bModified Then
                 wbNew.Save
                 saveCount = saveCount + 1
@@ -104,7 +114,7 @@ Sub SafeMergeNoFreeze()
         GoTo NextFile
         
 FileError:
-        Debug.Print "处理失败: " & CStr(vFile) & " | 错误: " & Err.Description
+        Debug.Print "失败: " & CStr(vFile) & " | " & Err.Description
         If Not wbOld Is Nothing Then wbOld.Close SaveChanges:=False
         If Not wbNew Is Nothing Then wbNew.Close SaveChanges:=False
         Set wbOld = Nothing: Set wbNew = Nothing
@@ -113,7 +123,6 @@ NextFile:
         On Error GoTo 0
     Next vFile
     
-    ' 恢复Excel环境
     With Application
         .ScreenUpdating = True
         .DisplayAlerts = True
@@ -121,7 +130,7 @@ NextFile:
         .EnableEvents = True
     End With
     
-    MsgBox "执行完毕！配对:" & matchCount & " | 保存:" & saveCount, vbInformation
+    MsgBox "执行完毕！配对:" & matchCount & " | 实际保存:" & saveCount, vbInformation
 End Sub
 ```
 
