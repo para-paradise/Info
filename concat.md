@@ -17,79 +17,103 @@
 按键盘上的 `Alt + F11` 打开 VBA 编辑器，点击菜单栏的 `插入` -> `模块`，然后把下面的代码全部复制进去：
 
 ```vba
-Sub SafeBatchMerge()
-    Dim sPath As String, sFile As String, sBaseName As String, sOldFile As String
+Sub MergeByRowWithForceSave()
+    Dim sPath As String, sFile As String, sBaseName As String
     Dim wbMain As Workbook, wbNew As Workbook, wbOld As Workbook
     Dim wsNew As Worksheet, wsOld As Worksheet
-    Dim r As Long, c As Long, lastRow As Long, lastCol As Long
+    Dim r As Long, c As Long, lastRowNew As Long, lastColNew As Long
+    Dim lastRowOld As Long, lastColOld As Long
     Dim dictOld As Object
+    Dim matchCount As Long, saveCount As Long
+    Dim bModified As Boolean
     
-    ' 强制关闭提示和屏幕刷新
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
     
     Set wbMain = ThisWorkbook
     sPath = wbMain.Path & "\"
     Set dictOld = CreateObject("Scripting.Dictionary")
+    matchCount = 0: saveCount = 0
     
-    ' 1. 先扫描一遍，把同文件夹下的所有 0821 旧文件存入字典
+    ' 1. 建立0821文件索引
     sFile = Dir(sPath & "*.xls*")
     Do While sFile <> ""
-        ' 【关键防呆】绝对排除宏文件自己，以及已经生成的结果文件
-        If sFile <> wbMain.Name And InStr(sFile, "0821") > 0 And InStr(sFile, "0914") = 0 Then
-            dictOld.Add sFile, True
+        If sFile <> wbMain.Name And InStr(sFile, "0821") > 0 Then
+            dictOld(LCase(sFile)) = True
         End If
         sFile = Dir()
     Loop
     
-    ' 2. 再次扫描，只处理 0914 新版文件
+    ' 2. 遍历0914文件并补充数据
     sFile = Dir(sPath & "*.xls*")
     Do While sFile <> ""
-        ' 【核心逻辑】只打开包含 "0914" 且不是宏文件的 Excel 文件
         If sFile <> wbMain.Name And InStr(sFile, "0914") > 0 Then
             On Error Resume Next
-            Set wbNew = Workbooks.Open(sPath & sFile)
             
-            ' 尝试从字典中配对 0821 的旧文件
-            sBaseName = Replace(sFile, "0914", "0821")
+            Set wbNew = Workbooks.Open(sPath & sFile)
+            If Err.Number <> 0 Then
+                Debug.Print "无法打开: " & sFile
+                Err.Clear
+                GoTo NextFile
+            End If
+            
+            ' 精确匹配0821文件（忽略大小写）
+            sBaseName = LCase(Replace(sFile, "0914", "0821"))
+            
             If dictOld.Exists(sBaseName) Then
-                sOldFile = sPath & sBaseName
-                Set wbOld = Workbooks.Open(sOldFile)
+                Set wbOld = Workbooks.Open(sPath & Replace(sFile, "0914", "0821"))
                 
-                Set wsNew = wbNew.Sheets(1) ' 默认操作新版文件的第一个Sheet
-                Set wsOld = wbOld.Sheets(1) ' 默认操作旧版文件的第一个Sheet
+                Set wsNew = wbNew.Sheets(1)
+                Set wsOld = wbOld.Sheets(1)
                 
-                ' 获取新版文件数据范围
-                lastRow = wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row
-                lastCol = wsNew.Cells(1, wsNew.Columns.Count).End(xlToLeft).Column
+                ' 获取实际数据范围（避免整表扫描）
+                lastRowNew = wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row
+                lastColNew = wsNew.Cells(1, wsNew.Columns.Count).End(xlToLeft).Column
+                lastRowOld = wsOld.Cells(wsOld.Rows.Count, 1).End(xlUp).Row
+                lastColOld = wsOld.Cells(1, wsOld.Columns.Count).End(xlToLeft).Column
                 
-                ' 遍历新版文件，如果是空单元格，则从旧版文件填入
-                For r = 1 To lastRow
-                    For c = 1 To lastCol
-                        If wsNew.Cells(r, c).Value = "" Then
+                bModified = False
+                
+                ' 按行补充：仅当0914某行为空且0821对应位置有值时才填入
+                For r = 1 To Application.Min(lastRowNew, lastRowOld)
+                    For c = 1 To Application.Min(lastColNew, lastColOld)
+                        If Trim(CStr(wsNew.Cells(r, c).Value)) = "" And _
+                           Trim(CStr(wsOld.Cells(r, c).Value)) <> "" Then
                             wsNew.Cells(r, c).Value = wsOld.Cells(r, c).Value
+                            bModified = True
                         End If
                     Next c
                 Next r
                 
-                ' 【关键动作】处理完一个配对，立刻保存并关闭 0821 旧文件
-                wbOld.Close SaveChanges:=True
+                ' 【关键修复】只要发生过修改，就显式保存
+                If bModified Then
+                    wbNew.Save
+                    saveCount = saveCount + 1
+                End If
+                
+                wbOld.Close SaveChanges:=False
                 Set wbOld = Nothing
+                matchCount = matchCount + 1
+            Else
+                Debug.Print "未找到配对0821文件: " & sBaseName
             End If
             
-            ' 【关键动作】保存并关闭 0914 新文件
-            wbNew.Close SaveChanges:=True
+            wbNew.Close SaveChanges:=False
             Set wbNew = Nothing
+            
+NextFile:
             On Error GoTo 0
         End If
         sFile = Dir()
     Loop
     
-    ' 恢复提示
     Application.ScreenUpdating = True
     Application.DisplayAlerts = True
     
-    MsgBox "所有文件已安全合并并保存完毕！宏文件未被修改。", vbInformation, "执行成功"
+    MsgBox "执行完毕！" & vbCrLf & _
+           "成功配对: " & matchCount & " 个文件" & vbCrLf & _
+           "实际保存: " & saveCount & " 个文件" & vbCrLf & _
+           "请查看VBA立即窗口(Ctrl+G)获取详细日志", vbInformation
 End Sub
 ```
 
