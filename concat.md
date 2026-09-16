@@ -17,148 +17,131 @@
 按键盘上的 `Alt + F11` 打开 VBA 编辑器，点击菜单栏的 `插入` -> `模块`，然后把下面的代码全部复制进去：
 
 ```vba
-Sub SmartMergeFiles()
+Sub BatchMergeData()
     Dim sPath As String
     Dim sFile As String
-    Dim wbTarget As Workbook
+    Dim wbTool As Workbook
     Dim wsResult As Worksheet
-    Dim dictNew As Object, dictOld As Object
-    Dim key As Variant
-    Dim arrFiles() As String
-    Dim i As Integer, fileCount As Integer
+    Dim wbNew As Workbook, wbOld As Workbook
+    Dim wsNew As Worksheet, wsOld As Worksheet
+    Dim arrData() As Variant
+    Dim i As Long, lLastRow As Long, lLastCol As Long
+    Dim r As Long, c As Long
+    Dim dictOldFiles As Object
+    Dim sBaseName As String
+    Dim sOldName As String
     
-    ' === 设置部分 ===
-    ' 获取当前宏文件所在的文件夹路径
-    sPath = ThisWorkbook.Path & "\"
-    
-    ' 设置字典用于存储文件配对
-    Set dictNew = CreateObject("Scripting.Dictionary")
-    Set dictOld = CreateObject("Scripting.Dictionary")
-    
+    ' 关闭屏幕刷新，提升速度
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
     
-    ' 1. 遍历文件夹，分类文件
-    sFile = Dir(sPath & "*.xlsx") ' 只找xlsx文件，避免死循环读取xlsm自身
-    fileCount = 0
+    Set wbTool = ThisWorkbook
+    sPath = wbTool.Path & "\"
     
+    ' 1. 扫描文件夹，提取所有0821旧版文件的文件名，存入字典
+    Set dictOldFiles = CreateObject("Scripting.Dictionary")
+    sFile = Dir(sPath & "*.xlsx")
     Do While sFile <> ""
-        ' 简单的判断逻辑：文件名包含 "20260914" 归为新版，包含 "20260821" 归为旧版
-        ' 你可以根据实际文件名修改这里的关键词
-        If InStr(sFile, "20260914") > 0 Then
-            ' 提取前缀作为Key，例如 "01VSACN-V产品_数据通信DFX测试模式库_安全性测试_"
-            ' 这里假设前缀是固定的，或者我们可以直接用文件名的一部分
-            ' 为了稳妥，我们截取 "_" 之前的部分作为匹配键，或者根据你截图的规律：
-            ' 01VSACN..._License... vs 01VSACN..._License...
-            ' 我们尝试提取 "01..." 到第一个日期前的特征，或者直接匹配整个结构
-            
-            ' 简化策略：直接存文件名，后续再匹配
-            dictNew(sFile) = 1 
-        ElseIf InStr(sFile, "20260821") > 0 Then
-            dictOld(sFile) = 1
+        If InStr(1, sFile, "0821") > 0 Then
+            ' 提取前缀作为Key，例如 "01VSACN-产品_数据通信DFX测试模式库"
+            sBaseName = Left(sFile, InStrRev(sFile, "_") - 1)
+            If Not dictOldFiles.Exists(sBaseName) Then
+                dictOldFiles.Add sBaseName, sFile
+            End If
         End If
         sFile = Dir
     Loop
     
-    If dictNew.Count = 0 Then
-        MsgBox "未找到包含 '20260914' 的新版文件！请检查文件名或代码关键词。", vbCritical
-        GoTo CleanUp
-    End If
-    
-    ' 2. 创建结果Sheet
+    ' 2. 创建一个新的结果Sheet，命名为 "最终合并结果"
+    ' 如果已经存在，直接清空；如果不存在，新建
     On Error Resume Next
-    Set wsResult = ThisWorkbook.Sheets("合并结果")
-    If wsResult Is Nothing Then
-        Set wsResult = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
-        wsResult.Name = "合并结果"
-    Else
-        wsResult.Cells.Clear ' 清空旧数据
-    End If
+    Set wsResult = wbTool.Sheets("最终合并结果")
     On Error GoTo 0
+    If wsResult Is Nothing Then
+        Set wsResult = wbTool.Sheets.Add(After:=wbTool.Sheets(wbTool.Sheets.Count))
+        wsResult.Name = "最终合并结果"
+    Else
+        wsResult.Cells.Clear
+    End If
     
-    ' 3. 开始配对合并
-    Dim newFile As Variant
-    Dim oldFile As Variant
-    Dim foundOld As Boolean
-    Dim r As Long, c As Long
-    Dim lastRow As Long, lastCol As Long
+    Dim lDestRow As Long
+    lDestRow = 1
     
-    ' 遍历每一个新版文件
-    For Each newFile In dictNew.Keys
-        ' 寻找对应的旧版文件
-        ' 逻辑：把新版文件名里的 "20260914" 替换成 "20260821"，看旧版字典里有没有
-        Dim targetOldName As String
-        targetOldName = Replace(CStr(newFile), "20260914", "20260821")
-        
-        If dictOld.Exists(targetOldName) Then
-            foundOld = True
-            oldFile = targetOldName
-        Else
-            foundOld = False
-        End If
-        
-        ' --- 打开新版文件 ---
-        Dim wbNew As Workbook
-        Set wbNew = Workbooks.Open(sPath & newFile, ReadOnly:=True)
-        Dim wsNew As Worksheet
-        Set wsNew = wbNew.Sheets(1) ' 默认取第一个Sheet，如有多个需调整
-        
-        ' --- 复制数据到结果表 ---
-        ' 计算结果表当前写到哪里了
-        Dim destRow As Long
-        destRow = wsResult.Cells(wsResult.Rows.Count, 1).End(xlUp).Row + 1
-        If destRow = 2 And wsResult.Cells(1, 1) = "" Then destRow = 1
-        
-        ' 获取新版数据的范围
-        lastRow = wsNew.Cells.Find("*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious).Row
-        lastCol = wsNew.Cells.Find("*", SearchOrder:=xlByColumns, SearchDirection:=xlPrevious).Column
-        
-        ' 先把新版数据全部复制过去（作为基础）
-        wsNew.Range(wsNew.Cells(1, 1), wsNew.Cells(lastRow, lastCol)).Copy
-        wsResult.Cells(destRow, 1).PasteSpecial xlPasteValuesAndNumberFormats
-        
-        ' --- 如果有旧版文件，进行“查漏补缺” ---
-        If foundOld Then
-            Dim wbOld As Workbook
-            Set wbOld = Workbooks.Open(sPath & oldFile, ReadOnly:=True)
-            Dim wsOld As Worksheet
-            Set wsOld = wbOld.Sheets(1)
-            
-            ' 遍历区域进行比对（为了速度，建议使用数组，这里为了逻辑清晰用循环，文件不大时没问题）
-            ' 优化：使用数组处理
-            Dim arrNew As Variant, arrOld As Variant
-            arrNew = wsResult.Range(wsResult.Cells(destRow, 1), wsResult.Cells(destRow + lastRow - 1, lastCol)).Value
-            arrOld = wsOld.Range(wsOld.Cells(1, 1), wsOld.Cells(lastRow, lastCol)).Value
-            
-            Dim rr As Long, cc As Long
-            For rr = 1 To UBound(arrNew, 1)
-                For cc = 1 To UBound(arrNew, 2)
-                    ' 核心逻辑：如果新版(arrNew)是空的，且旧版(arrOld)不是空的，则取旧版
-                    If (arrNew(rr, cc) = "" Or IsEmpty(arrNew(rr, cc))) And _
-                       (arrOld(rr, cc) <> "" And Not IsEmpty(arrOld(rr, cc))) Then
-                        arrNew(rr, cc) = arrOld(rr, cc)
+    ' 3. 遍历所有0914新版文件进行合并
+    sFile = Dir(sPath & "*.xlsx")
+    Do While sFile <> ""
+        ' 排除自身、排除0821文件、排除已经生成的结果文件
+        If sFile <> "合并工具.xlsm" And sFile <> "合并结果.xlsx" And sFile <> "最终合并结果.xlsx" Then
+            If InStr(1, sFile, "0914") > 0 Then
+                ' 提取当前0914文件的基础名称
+                sBaseName = Left(sFile, InStrRev(sFile, "_") - 1)
+                
+                ' 尝试打开新版文件
+                On Error Resume Next
+                Set wbNew = Workbooks.Open(sPath & sFile, False, True) ' 只读打开
+                If Err.Number <> 0 Then
+                    Err.Clear
+                    GoTo NextFile
+                End If
+                On Error GoTo 0
+                
+                Set wsNew = wbNew.Sheets(1)
+                lLastRow = wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row
+                lLastCol = wsNew.Cells(1, wsNew.Columns.Count).End(xlToLeft).Column
+                
+                ' 4. 核心逻辑：如果该0914有对应的0821旧文件，进行数据补充
+                If dictOldFiles.Exists(sBaseName) Then
+                    sOldName = dictOldFiles(sBaseName)
+                    
+                    On Error Resume Next
+                    Set wbOld = Workbooks.Open(sPath & sOldName, False, True)
+                    On Error GoTo 0
+                    
+                    If Not wbOld Is Nothing Then
+                        Set wsOld = wbOld.Sheets(1)
+                        arrData = wsNew.Range(wsNew.Cells(1, 1), wsNew.Cells(lLastRow, lLastCol)).Value
+                        
+                        ' 遍历新版数据，如果单元格为空且旧版对应位置有值，则填充旧版值
+                        For r = 1 To UBound(arrData, 1)
+                            For c = 1 To UBound(arrData, 2)
+                                If Trim(arrData(r, c)) = "" Then
+                                    If Not IsEmpty(wsOld.Cells(r, c)) And Trim(wsOld.Cells(r, c).Value) <> "" Then
+                                        arrData(r, c) = wsOld.Cells(r, c).Value
+                                    End If
+                                End If
+                            Next c
+                        Next r
+                        
+                        ' 将处理好的数据写入结果Sheet
+                        wsResult.Range(wsResult.Cells(lDestRow, 1), wsResult.Cells(lDestRow + lLastRow - 1, lLastCol)).Value = arrData
+                        lDestRow = lDestRow + lLastRow
+                        
+                        wbOld.Close False
+                        Set wbOld = Nothing
+                    Else
+                        ' 如果没有对应的旧版文件，直接把0914的数据复制过去
+                        wsNew.Range(wsNew.Cells(1, 1), wsNew.Cells(lLastRow, lLastCol)).Copy Destination:=wsResult.Cells(lDestRow, 1)
+                        lDestRow = lDestRow + lLastRow
                     End If
-                Next cc
-            Next rr
-            
-            ' 将合并好的数组写回表格
-            wsResult.Range(wsResult.Cells(destRow, 1), wsResult.Cells(destRow + lastRow - 1, lastCol)).Value = arrNew
-            
-            wbOld.Close SaveChanges:=False
+                Else
+                    ' 如果没有对应的旧版文件，直接把0914的数据复制过去
+                    wsNew.Range(wsNew.Cells(1, 1), wsNew.Cells(lLastRow, lLastCol)).Copy Destination:=wsResult.Cells(lDestRow, 1)
+                    lDestRow = lDestRow + lLastRow
+                End If
+                
+                wbNew.Close False
+                Set wbNew = Nothing
+            End If
         End If
-        
-        wbNew.Close SaveChanges:=False
-        
-        ' 在结果表的最左侧或最右侧标记一下数据来源（可选）
-        ' wsResult.Cells(destRow, lastCol + 1).Value = "来源: " & newFile
-        
-    Next newFile
+NextFile:
+        sFile = Dir
+    Loop
     
-    MsgBox "处理完成！共处理 " & dictNew.Count & " 个新版文件。", vbInformation
-
-CleanUp:
+    ' 恢复屏幕刷新
     Application.ScreenUpdating = True
     Application.DisplayAlerts = True
+    
+    MsgBox "恭喜！所有0914数据已根据0821增量补充完毕，结果已保存至【最终合并结果】Sheet中！", vbInformation, "批量合并完成"
 End Sub
 ```
 
