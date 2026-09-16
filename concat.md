@@ -17,7 +17,196 @@
 按键盘上的 `Alt + F11` 打开 VBA 编辑器，点击菜单栏的 `插入` -> `模块`，然后把下面的代码全部复制进去：
 
 ```vba
-
+Sub ConditionalGroupFill_FinalFix()
+    Dim sPath As String, sFile As String
+    Dim wbMain As Workbook, wbNew As Workbook, wbOld As Workbook
+    Dim wsNew As Worksheet, wsOld As Worksheet
+    Dim dictOld As Object, arrFiles As Object
+    Dim r As Long, maxRow As Long, col As Long
+    Dim matchCount As Long, saveCount As Long, bModified As Boolean
+    Dim vNew As Variant, vOld As Variant
+    Dim triggerFill As Boolean
+    Dim sFileName As String, sOldFileName As String, sOldFilePath As String
+    Dim wsWasProtected As Boolean, wasShared As Boolean
+    Dim rngTarget As Range
+    
+    With Application
+        .ScreenUpdating = False
+        .DisplayAlerts = False
+        .Calculation = xlCalculationManual
+        .EnableEvents = False
+    End With
+    
+    Set wbMain = ThisWorkbook
+    sPath = wbMain.Path
+    If Right(sPath, 1) <> "\" Then sPath = sPath & "\"
+    
+    Set dictOld = CreateObject("Scripting.Dictionary")
+    Set arrFiles = CreateObject("System.Collections.ArrayList")
+    
+    ' 收集 0821 文件索引
+    sFile = Dir(sPath & "*.xls*")
+    Do While sFile <> ""
+        If LCase(sFile) <> LCase(wbMain.Name) And InStr(sFile, "0821") > 0 Then
+            dictOld(LCase(sFile)) = True
+        End If
+        sFile = Dir()
+    Loop
+    
+    ' 收集 0914 文件路径
+    sFile = Dir(sPath & "*.xls*")
+    Do While sFile <> ""
+        If LCase(sFile) <> LCase(wbMain.Name) And InStr(sFile, "0914") > 0 Then
+            arrFiles.Add sPath & sFile
+        End If
+        sFile = Dir()
+    Loop
+    
+    Dim vFile As Variant
+    For Each vFile In arrFiles.ToArray
+        On Error GoTo FileError
+        
+        sFileName = Mid(CStr(vFile), InStrRev(CStr(vFile), "\") + 1)
+        sOldFileName = Replace(sFileName, "0914", "0821")
+        sOldFilePath = sPath & sOldFileName
+        
+        If dictOld.Exists(LCase(sOldFileName)) Then
+            matchCount = matchCount + 1
+            
+            Set wbNew = Workbooks.Open(CStr(vFile), ReadOnly:=False)
+            Set wbOld = Workbooks.Open(sOldFilePath, ReadOnly:=True)
+            
+            ' 【防御1】退出共享工作簿模式（共享模式下许多操作会报1004）
+            wasShared = False
+            On Error Resume Next
+            If wbNew.MultiUserEditing Then
+                wbNew.ExclusiveAccess
+                wasShared = True
+            End If
+            On Error GoTo FileError
+            
+            Set wsNew = wbNew.Worksheets(1)
+            Set wsOld = wbOld.Worksheets(1)
+            
+            ' 【防御2】确保工作表可见
+            If wsNew.Visible <> xlSheetVisible Then wsNew.Visible = xlSheetVisible
+            
+            ' 【防御3】解除保护
+            wsWasProtected = wsNew.ProtectContents
+            If wsWasProtected Then
+                On Error Resume Next
+                wsNew.Unprotect
+                On Error GoTo FileError
+            End If
+            
+            ' 【防御4】强制取消 W~AB 列及当前行的隐藏状态
+            On Error Resume Next
+            wsNew.Columns("W:AB").EntireColumn.Hidden = False
+            On Error GoTo FileError
+            
+            ' 【防御5】安全获取最大行数
+            maxRow = 1
+            On Error Resume Next
+            maxRow = Application.Max( _
+                wsNew.Cells(wsNew.Rows.Count, 1).End(xlUp).Row, _
+                wsNew.Cells(wsNew.Rows.Count, 23).End(xlUp).Row, _
+                wsOld.Cells(wsOld.Rows.Count, 1).End(xlUp).Row, _
+                wsOld.Cells(wsOld.Rows.Count, 23).End(xlUp).Row)
+            On Error GoTo FileError
+            If maxRow < 2 Or maxRow > 100000 Then maxRow = 100000
+            
+            bModified = False
+            
+            For r = 2 To maxRow
+                triggerFill = False
+                
+                ' 检查 W(23)/X(24)/Y(25)/Z(26)
+                For col = 23 To 26
+                    vNew = "" : vOld = ""
+                    On Error Resume Next
+                    vNew = Trim(CStr(wsNew.Cells(r, col).Value2)) ' 使用 Value2 绕过格式层
+                    vOld = Trim(CStr(wsOld.Cells(r, col).Value2))
+                    On Error GoTo FileError
+                    
+                    If Len(vNew) = 0 And Len(vOld) > 0 Then
+                        triggerFill = True
+                        Exit For
+                    End If
+                Next col
+                
+                If triggerFill Then
+                    ' 【防御6】写入前取消当前行隐藏
+                    On Error Resume Next
+                    wsNew.Rows(r).Hidden = False
+                    On Error GoTo FileError
+                    
+                    Set rngTarget = wsNew.Cells(r, 23).Resize(1, 6)
+                    
+                    ' 彻底清除目标区域所有阻断因素
+                    On Error Resume Next
+                    rngTarget.ClearContents
+                    rngTarget.UnMerge
+                    rngTarget.Validation.Delete
+                    rngTarget.FormatConditions.Delete
+                    On Error GoTo FileError
+                    
+                    ' 【核心修复】使用 Value2 写入，避免 .Value 触发的格式解析1004
+                    For col = 23 To 28
+                        On Error Resume Next
+                        wsNew.Cells(r, col).Value2 = wsOld.Cells(r, col).Value2
+                        If Err.Number <> 0 Then
+                            Err.Clear
+                            ' Fallback: 直接复制粘贴值（最底层写入方式）
+                            wsOld.Cells(r, col).Copy
+                            wsNew.Cells(r, col).PasteSpecial xlPasteValues
+                            Application.CutCopyMode = False
+                        End If
+                        On Error GoTo FileError
+                    Next col
+                    bModified = True
+                End If
+            Next r
+            
+            ' 恢复保护
+            If wsWasProtected Then
+                On Error Resume Next
+                wsNew.Protect
+                On Error GoTo FileError
+            End If
+            
+            If bModified Then
+                wbNew.Save
+                saveCount = saveCount + 1
+            End If
+            
+            wbOld.Close SaveChanges:=False
+            wbNew.Close SaveChanges:=False
+            Set wbOld = Nothing: Set wbNew = Nothing
+        End If
+        
+        GoTo NextFile
+        
+FileError:
+        Debug.Print "失败: " & sFileName & " | 行:" & r & " 列:" & col & " | " & Err.Description
+        On Error Resume Next
+        If wsWasProtected And Not wsNew Is Nothing Then wsNew.Protect
+        If Not wbOld Is Nothing Then wbOld.Close SaveChanges:=False
+        If Not wbNew Is Nothing Then wbNew.Close SaveChanges:=False
+        Set wbOld = Nothing: Set wbNew = Nothing
+        On Error GoTo 0
+        
+NextFile:
+    Next vFile
+    
+    With Application
+        .ScreenUpdating = True
+        .DisplayAlerts = True
+        .Calculation = xlCalculationAutomatic
+        .EnableEvents = True
+    End With
+    
+    MsgBox "执行完毕！配对:" & matchCount & " | 保存:" & saveCount, vbInformation
+End Sub
 ```
 
 ### 第三步：运行
