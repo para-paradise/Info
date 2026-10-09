@@ -1,0 +1,770 @@
+{
+    "state": 1,
+    "msg": null,
+    "data": [
+        {
+            "attackType": "AckFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "AntiArpFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "ArpErrorFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "ArpReflection",
+            "ipv6": 0
+        },
+        {
+            "attackType": "ArpReplyFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "ArpRequestFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "BGPFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "BgpResetAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "BgpUpdateAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Bomba",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Bonk",
+            "ipv6": 0
+        },
+        {
+            "attackType": "CoAPFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "CoAPFlood(DTLS)",
+            "ipv6": 0
+        },
+        {
+            "attackType": "CoAPFlood(TCP)",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DHCPAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DHCPDiscoverFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DHCPFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DHCPFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DLMSFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsDomainNameFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsDomainNameFreak_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DnsFieldFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsFieldFreak_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DnsFloodServer(simulate)",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsFreak_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DnsPayLoadFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsPayLoadFreak_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DnsPoisonAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsPoisonAttack_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DnsQueryFieldFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsQueryFieldFreak_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DnsQueryFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsQueryFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DnsQuestionsFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsQuestionsFreak_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DnsReplyFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsReplyFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DnsResourceRecordFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsResourceRecordFreak_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DnsSpoofingAtk",
+            "ipv6": 0
+        },
+        {
+            "attackType": "DnsSpoofingAtk_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "DtlsConnectAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "EvilBladeHttpFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "EvilBladeHttpFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "Fawx",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Flood1AG",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Flood3AH",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Flood8021x",
+            "ipv6": 0
+        },
+        {
+            "attackType": "FloodMstp",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Fraggle",
+            "ipv6": 0
+        },
+        {
+            "attackType": "FragmentLargeOffset",
+            "ipv6": 0
+        },
+        {
+            "attackType": "FragmentLargeOffset_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "FragmentsDeny",
+            "ipv6": 0
+        },
+        {
+            "attackType": "FragmentsDeny_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "FragmentTooMany",
+            "ipv6": 0
+        },
+        {
+            "attackType": "FragmentTooMany_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "FTPMultiClientAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "GratuitousARP",
+            "ipv6": 0
+        },
+        {
+            "attackType": "GREFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "GTPFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "HttpConnectionFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "HttpGetFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "HttpGetFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "HttpNoTcpEstablish",
+            "ipv6": 0
+        },
+        {
+            "attackType": "HttpPostFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "HttpPostFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "HttpRequestMalformation",
+            "ipv6": 0
+        },
+        {
+            "attackType": "HttpResponseMalformation",
+            "ipv6": 0
+        },
+        {
+            "attackType": "HttpsAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "HttpsFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpCaptureQuench",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpCaptureRedirect",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpCaptureUnreach",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpFragmentFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpMaskReply",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpMaskRequest",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpNeighborAdvertisement_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpNeighborSolicitation_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpPacketTooBig_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpParameterProblem_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpReachable_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpRedirect",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpRedirect_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpRouterAdvertisement_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpRouterSolicitation_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpScanAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpScanAttack_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpSourceQuench",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpTimeExceeded_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IcmpUnreachable",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IcmpUnreachable_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IgmpNoPayload",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IKEFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IpBadOption",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IpFragmentFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IpFragmentFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IpHeadErrorLength_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IpHeadMalform",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IpHeadOrder_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IpHeadParameter_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IpHeadStreamOption",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IpHeadStreamOption_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IpLooseSourceRoute",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IpMalformPkt",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IpNoPayload",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IpNoPayload_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "IPSECFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "IpStrictSourceRoute",
+            "ipv6": 0
+        },
+        {
+            "attackType": "ISISFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "J808Flood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Jolt",
+            "ipv6": 0
+        },
+        {
+            "attackType": "L2TPFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Land",
+            "ipv6": 0
+        },
+        {
+            "attackType": "LandTCP_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "LargeRtp",
+            "ipv6": 0
+        },
+        {
+            "attackType": "MACTransFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "MixedFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "MixedFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "MLDFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "MQTTFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "NatIdentify",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Nesta",
+            "ipv6": 0
+        },
+        {
+            "attackType": "NewTear",
+            "ipv6": 0
+        },
+        {
+            "attackType": "NTPFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "OpenFlowHelloFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "OSPFFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "PingofDeath",
+            "ipv6": 0
+        },
+        {
+            "attackType": "PingofDeath_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "RadiusFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Rose",
+            "ipv6": 0
+        },
+        {
+            "attackType": "RtpAudioInsert",
+            "ipv6": 0
+        },
+        {
+            "attackType": "RtpFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "RtpFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "RtpVideoInsert",
+            "ipv6": 0
+        },
+        {
+            "attackType": "RtspFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "RtspPlayFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SackAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SctpFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SipFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SipFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "SIPFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SlowHTTP",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SlowHttp_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "SlowRead",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Smurf",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SNMPFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SpecialSrcIpFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SSDPFLood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SSHFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SSHLoginAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SslAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SslAttack_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "SSLFreak",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SSLRenegotiate",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SuperIcmp",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SynAckFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SynAckFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "SynDrop",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SynFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "SynFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "TcpConnectionFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TcpConnectionFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "TcpFinNoAck",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TcpFinRstFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TcpFinSyn",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TcpFlagFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TcpFlagValid",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TcpFragmentFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TcpPktNoFlag",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TcpPortScan",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TcpScanAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TcpScanAttack_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "TcpStress",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TearDrop",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TearDrop_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "TelnetAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "TelnetMultiClientAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "Tracert",
+            "ipv6": 0
+        },
+        {
+            "attackType": "UdpDiagportFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "UdpFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "UdpFlood_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "UdpFragmentFlood",
+            "ipv6": 0
+        },
+        {
+            "attackType": "UdpPortScan",
+            "ipv6": 0
+        },
+        {
+            "attackType": "UdpScanAttack",
+            "ipv6": 0
+        },
+        {
+            "attackType": "UdpScanAttack_v6",
+            "ipv6": 1
+        },
+        {
+            "attackType": "UnknownProtocol",
+            "ipv6": 0
+        },
+        {
+            "attackType": "WinNuke",
+            "ipv6": 0
+        }
+    ],
+    "detailMap": null,
+    "total": 0,
+    "recordsFiltered": 0,
+    "success": true
+}
